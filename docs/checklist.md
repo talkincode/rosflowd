@@ -30,11 +30,12 @@
 - [x] wireless SSID 经 `--identity` JSONL sidecar（不登录 ROS）
 - [x] TLS SNI（纯 Rust）
 - [x] QUIC v1 Initial SNI
+- [x] DNS A 记录映射 `confidence=dns`（TZSP，非 DPI）
 - [x] `dpi.engine` 如实为 `port`（未接 nDPI）
-- [ ] nDPI 可选引擎
+- [ ] nDPI 可选引擎（故意未接 C 库；单二进制默认不捆绑 LGPL nDPI）
 
 ## 发布
 
 - [x] `cargo build --release` 产物说明（`docs/install.md`）
-- [ ] Linux amd64/arm64 CI 发布产物
-- [ ] 覆盖率门禁（需要时再加，不阻塞 v5 回放闭环）
+- [x] Linux amd64/arm64 CI 发布产物（tag `v*`）
+- [ ] 覆盖率门禁（需要时再加，不阻塞现有 E2E）

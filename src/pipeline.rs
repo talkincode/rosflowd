@@ -8,6 +8,7 @@ use std::time::Duration;
 use chrono::Utc;
 
 use crate::dhcp;
+use crate::dns;
 use crate::error::{Error, Result};
 use crate::hints::Hints;
 use crate::identity::client_ip;
@@ -50,6 +51,16 @@ pub fn process_tzsp(store: &mut Store, hints: &mut Hints, datagram: &[u8]) {
         if let Some((ip, ident)) = dhcp::parse_ack(&l4.payload) {
             store.apply_identity(ip, &ident);
             hints.remember_identity(ip, ident);
+        }
+    }
+    if l4.proto == 17 && (l4.dst_port == 53 || l4.src_port == 53) {
+        if let Some(records) = dns::a_records(&l4.payload) {
+            if let Some(client) = client_ip(l4.src, l4.dst) {
+                for (ip, name) in records {
+                    store.note_dns();
+                    hints.remember_dns(client, ip, name);
+                }
+            }
         }
     }
     let sni_name = sni::client_hello_sni(&l4.payload).or_else(|| {

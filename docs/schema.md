@@ -6,7 +6,7 @@ Additive optional fields do **not** bump the version. A breaking rename/type cha
 
 ## v1 fields
 
-`metadata.json`: `schema_version`, `retain_days`, `listen`, `time_zone`, `dpi.engine`, `dpi.status`, `dpi.sni`. Optional: `tzsp`.
+`metadata.json`: `schema_version`, `retain_days`, `listen`, `time_zone`, `dpi.engine`, `dpi.status`, `dpi.sni`, `dpi.dns`. Optional: `tzsp`.
 
 Day files:
 
@@ -15,4 +15,4 @@ Day files:
 - `hourly.json`: unix-hour string → bytes.
 - `ingest.json`: `datagrams`, `flows`, `decode_errors`, `unsupported_version`, `no_client`, `tzsp_datagrams`, `dpi_dropped`.
 
-`dpi.engine` is `port` until nDPI is wired. SNI uses `dpi.sni=true` and `confidence=sni`.
+`dpi.engine` is `port` until nDPI is wired. SNI uses `dpi.sni=true` and `confidence=sni`. DNS A-record mapping uses `dpi.dns=true` and `confidence=dns`. Neither is DPI.

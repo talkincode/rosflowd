@@ -47,7 +47,8 @@
 - DHCP ACK → MAC/hostname 写入 `clients.jsonl`。证据：`e2e_dhcp_ack_attaches_hostname`。
 - QUIC v1 Initial SNI（解密 CRYPTO 中的 ClientHello）。证据：`src/quic.rs`，`e2e_quic_sni_classifies_later_flow`。
 - `--identity` JSONL sidecar 填 MAC/hostname/SSID（无线注册表由外部 dump，守护进程不登录 ROS）。证据：`e2e_identity_sidecar_ssid`。
-- nDPI：**未实现**。
+- DNS A 记录（TZSP）把客户端+解析 IP 映射成名字，后续流 `confidence=dns`。证据：`src/dns.rs`，`e2e_dns_a_classifies_later_flow`。
+- nDPI：**未实现**（不把 C/LGPL 库打进默认单二进制；`dpi.engine` 不得写成 `ndpi`）。
 
 ## 非目标（铁律）
 
@@ -101,7 +102,8 @@
 | QUIC SNI | 中 | ✅ | ✅ 非 Initial 忽略 | 不适用 | 不适用 | `quic` 单测；`e2e_quic_sni_classifies_later_flow` |
 | Identity sidecar | 中 | ✅ | ✅ 坏 JSON 失败 | 不适用 | 不适用 | `sidecar` 单测；`e2e_identity_sidecar_ssid` |
 | DHCP 身份 | 中 | ✅ | 不适用（非 ACK 忽略） | 不适用 | ✅ 迟到 ACK 可回填已有客户端 | `e2e_dhcp_ack_attaches_hostname` |
-| nDPI | 高 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用 | 未实现；`dpi.engine` 不得写成 `ndpi` |
+| DNS 映射 | 中 | ✅ | ✅ 纯查询无 A 则忽略 | 不适用 | 不适用 | `dns` 单测；`e2e_dns_a_classifies_later_flow` |
+| nDPI | 高 | ❌ 缺口 | 不适用 | 不适用 | 不适用 | 故意不捆绑；`dpi.engine` 不得写成 `ndpi` |
 | IPFIX / NetFlow v9 | 中 | ✅ | ✅ 缺模板不计流；IPFIX 长度不符 | 不适用 | 不适用 | `e2e_replay_v9_lan_https`；`e2e_replay_ipfix_lan_https`；`v9::data_without_template_yields_no_flows` |
 
 nDPI 在有 golden 包与可选引擎之前不得打开默认引擎。`dpi.engine` 仍为 `port`；SNI 只用 `dpi.sni=true` 与 `confidence=sni` 声明。

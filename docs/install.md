@@ -34,11 +34,18 @@ rosflowd --listen 0.0.0.0:2055 --tzsp 0.0.0.0:37008 --data ./data
 
 Point RouterOS `/ip traffic-flow` at the collector from a **LAN bridge**. Optional `/tool sniffer streaming` TZSP is sampled only.
 
-## Linux release (manual)
+## Linux release
+
+Tag `v*` on `main` runs `.github/workflows/release.yml` and attaches:
+
+- `rosflowd-linux-amd64.tar.gz`
+- `rosflowd-linux-arm64.tar.gz`
+
+plus `.sha256` sidecars. Builds are musl (`x86_64-unknown-linux-musl` / `aarch64-unknown-linux-musl`).
+
+Manual:
 
 ```bash
-cargo build --release --target x86_64-unknown-linux-musl
-cargo build --release --target aarch64-unknown-linux-musl
+cargo build --release --locked --target x86_64-unknown-linux-musl
+cargo build --release --locked --target aarch64-unknown-linux-musl
 ```
-
-CI does not publish artifacts yet.

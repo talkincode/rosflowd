@@ -373,3 +373,39 @@ fn e2e_identity_sidecar_ssid() {
     assert!(clients.contains("\"ssid\":\"a2\""), "got {clients}");
     assert!(clients.contains("Xiaomi-15-Ultra"), "got {clients}");
 }
+
+#[test]
+fn e2e_dns_a_classifies_later_flow() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut store = Store::new(tmp.path(), 7, "replay");
+    let mut decoder = Decoder::default();
+    let mut hints = Hints::default();
+    let answer = rosflowd::dns::encode_a_response("www.example.com", Ipv4Addr::new(1, 1, 1, 1));
+    let frame = rosflowd::packet::ethernet_ipv4(
+        [0x02, 0, 0, 0, 0, 1],
+        17,
+        Ipv4Addr::new(8, 8, 8, 8),
+        Ipv4Addr::new(10, 0, 0, 95),
+        53,
+        50000,
+        &answer,
+    );
+    process_tzsp(
+        &mut store,
+        &mut hints,
+        &rosflowd::tzsp::encode_ethernet(&frame),
+    );
+    let pkt = v5::encode(lan_https().unix_secs, &[lan_https()]);
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
+    store.flush().unwrap();
+    let apps = fs::read_to_string(tmp.path().join("2024-01-01").join("apps.jsonl")).unwrap();
+    assert!(apps.contains("www.example.com"), "got {apps}");
+    assert!(apps.contains("\"confidence\":\"dns\""), "got {apps}");
+    let clients = fs::read_to_string(tmp.path().join("2024-01-01").join("clients.jsonl")).unwrap();
+    assert!(clients.contains("4096"), "got {clients}");
+    let meta: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(tmp.path().join("metadata.json")).unwrap())
+            .unwrap();
+    assert_eq!(meta["dpi"]["engine"], "port");
+    assert_eq!(meta["dpi"]["dns"], true);
+}

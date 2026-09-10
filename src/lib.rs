@@ -1,6 +1,7 @@
 pub mod classify;
 pub mod clock;
 pub mod dhcp;
+pub mod dns;
 pub mod error;
 pub mod flow;
 pub mod hints;

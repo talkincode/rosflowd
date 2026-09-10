@@ -9,6 +9,7 @@ use crate::identity::{client_ip_for_flow, ClientIdentity};
 pub struct Hints {
     pub identity: HashMap<Ipv4Addr, ClientIdentity>,
     sni: HashMap<(Ipv4Addr, Ipv4Addr, u16), String>,
+    dns: HashMap<(Ipv4Addr, Ipv4Addr), String>,
 }
 
 impl Hints {
@@ -25,6 +26,20 @@ impl Hints {
     pub fn remember_identity(&mut self, ip: Ipv4Addr, ident: ClientIdentity) {
         let entry = self.identity.entry(ip).or_default();
         crate::identity::merge_identity(entry, ident);
+    }
+
+    pub fn remember_dns(&mut self, client: Ipv4Addr, server: Ipv4Addr, name: String) {
+        self.dns.insert((client, server), name);
+    }
+
+    pub fn dns_for(&self, flow: &Flow) -> Option<&str> {
+        let client = client_ip_for_flow(flow)?;
+        let server = if flow.src == client {
+            flow.dst
+        } else {
+            flow.src
+        };
+        self.dns.get(&(client, server)).map(String::as_str)
     }
 
     pub fn sni_for(&self, flow: &Flow) -> Option<&str> {
@@ -44,6 +59,14 @@ impl Hints {
                 category: "web".to_string(),
                 confidence: "sni".to_string(),
                 evidence: format!("sni={sni}"),
+            };
+        }
+        if let Some(name) = self.dns_for(flow) {
+            return Classification {
+                app: name.to_string(),
+                category: "web".to_string(),
+                confidence: "dns".to_string(),
+                evidence: format!("dns={name}"),
             };
         }
         classify(flow)

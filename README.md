@@ -26,7 +26,7 @@ rosflowd --replay flow.nfv5 --identity clients.jsonl --data ./data
 
 采集必须来自 **LAN 桥**。WAN 口导出的流在 NAT 之后，无法对应到家里的客户端。
 
-当前分类是知名端口（L2）；TZSP 样本可补 TLS/QUIC SNI（`confidence=sni`），**不是** DPI。nDPI 未实现。构建说明见 [`docs/install.md`](docs/install.md)。
+当前分类是知名端口（L2）；TZSP 样本可补 TLS/QUIC SNI（`confidence=sni`）和 DNS A 映射（`confidence=dns`），**都不是** DPI。nDPI 未捆绑。构建与 tag 发布见 [`docs/install.md`](docs/install.md)。
 
 ## 数据目录
 

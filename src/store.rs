@@ -70,6 +70,7 @@ pub struct Store {
     stats: IngestStats,
     tzsp: String,
     sni_enabled: bool,
+    dns_enabled: bool,
 }
 
 impl Store {
@@ -84,6 +85,7 @@ impl Store {
             stats: IngestStats::default(),
             tzsp: String::new(),
             sni_enabled: false,
+            dns_enabled: false,
         }
     }
 
@@ -117,6 +119,10 @@ impl Store {
 
     pub fn note_sni(&mut self) {
         self.sni_enabled = true;
+    }
+
+    pub fn note_dns(&mut self) {
+        self.dns_enabled = true;
     }
 
     pub fn apply_identity(&mut self, ip: Ipv4Addr, ident: &ClientIdentity) {
@@ -194,6 +200,7 @@ impl Store {
                 engine: "port",
                 status: "l2",
                 sni: self.sni_enabled,
+                dns: self.dns_enabled,
             },
             time_zone: "UTC",
         };
@@ -350,6 +357,7 @@ struct DpiMeta {
     engine: &'static str,
     status: &'static str,
     sni: bool,
+    dns: bool,
 }
 
 #[derive(Serialize)]

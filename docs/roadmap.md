@@ -45,7 +45,9 @@
 - 保留最近 N 个日历日（默认 7），删除更旧日目录。证据：`src/store.rs` 保留测试。
 - TZSP 采样 ingest（`--tzsp`，默关）：解析以太网帧，提取 TLS SNI / DHCP ACK；失败只增加 `dpi_dropped`，不改 NetFlow 字节。证据：`e2e_tzsp_sni_classifies_later_flow`、`e2e_tzsp_drop_does_not_change_netflow_bytes`。
 - DHCP ACK → MAC/hostname 写入 `clients.jsonl`。证据：`e2e_dhcp_ack_attaches_hostname`。
-- nDPI、wireless SSID、QUIC SNI：**未实现**。
+- QUIC v1 Initial SNI（解密 CRYPTO 中的 ClientHello）。证据：`src/quic.rs`，`e2e_quic_sni_classifies_later_flow`。
+- `--identity` JSONL sidecar 填 MAC/hostname/SSID（无线注册表由外部 dump，守护进程不登录 ROS）。证据：`e2e_identity_sidecar_ssid`。
+- nDPI：**未实现**。
 
 ## 非目标（铁律）
 
@@ -96,6 +98,8 @@
 | UDP 监听 | 中 | ✅ | ✅ 无效地址绑定失败 | 不适用 | 不适用（失败则不进入收包循环） | `e2e_udp_v5_happy_path`；`e2e_listen_invalid_addr_fails` |
 | TZSP 采样 | 高 | ✅ | ✅ 坏包 `dpi_dropped` 且字节不变 | 不适用 | ✅ 不回写 NetFlow 计数 | `e2e_tzsp_sni_classifies_later_flow`；`e2e_tzsp_drop_does_not_change_netflow_bytes` |
 | TLS SNI | 中 | ✅ | ✅ 非 TLS payload 忽略 | 不适用 | 不适用 | `sni` 单测；`e2e_tzsp_sni_classifies_later_flow` |
+| QUIC SNI | 中 | ✅ | ✅ 非 Initial 忽略 | 不适用 | 不适用 | `quic` 单测；`e2e_quic_sni_classifies_later_flow` |
+| Identity sidecar | 中 | ✅ | ✅ 坏 JSON 失败 | 不适用 | 不适用 | `sidecar` 单测；`e2e_identity_sidecar_ssid` |
 | DHCP 身份 | 中 | ✅ | 不适用（非 ACK 忽略） | 不适用 | ✅ 迟到 ACK 可回填已有客户端 | `e2e_dhcp_ack_attaches_hostname` |
 | nDPI | 高 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用 | 未实现；`dpi.engine` 不得写成 `ndpi` |
 | IPFIX / NetFlow v9 | 中 | ✅ | ✅ 缺模板不计流；IPFIX 长度不符 | 不适用 | 不适用 | `e2e_replay_v9_lan_https`；`e2e_replay_ipfix_lan_https`；`v9::data_without_template_yields_no_flows` |

@@ -8,6 +8,8 @@ pub mod identity;
 pub mod netflow;
 pub mod packet;
 pub mod pipeline;
+pub mod quic;
+pub mod sidecar;
 pub mod sni;
 pub mod store;
 pub mod tzsp;

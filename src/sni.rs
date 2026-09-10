@@ -1,10 +1,15 @@
 /// Extract SNI from a TLS record that begins a ClientHello.
 pub fn client_hello_sni(payload: &[u8]) -> Option<String> {
     if payload.len() < 5 || payload[0] != 0x16 {
-        return None;
+        return handshake_sni(payload);
     }
     let rec_len = u16::from_be_bytes([payload[3], payload[4]]) as usize;
     let hs = payload.get(5..5 + rec_len)?;
+    handshake_sni(hs)
+}
+
+/// TLS handshake bytes starting at a Handshake message (no record layer).
+pub fn handshake_sni(hs: &[u8]) -> Option<String> {
     if hs.len() < 4 || hs[0] != 0x01 {
         return None;
     }

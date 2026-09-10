@@ -9,7 +9,7 @@
 - [x] 按日历日分目录，默认保留 7 天
 - [x] WAN-only 流不得写入 LAN 客户端主键
 - [x] 不把 NetFlow 结果标成 DPI
-- [ ] `schema_version` 变更有升级说明
+- [x] `schema_version` 变更有升级说明（`docs/schema.md`；v1 仅允许加字段）
 
 ## 采集
 
@@ -27,14 +27,14 @@
 - [x] RFC1918 客户端主键
 - [x] 端口分类 `confidence=port`
 - [x] DHCP ACK 关联 MAC/hostname
-- [ ] wireless registration 关联 SSID
+- [x] wireless SSID 经 `--identity` JSONL sidecar（不登录 ROS）
 - [x] TLS SNI（纯 Rust）
-- [ ] QUIC SNI
+- [x] QUIC v1 Initial SNI
 - [x] `dpi.engine` 如实为 `port`（未接 nDPI）
 - [ ] nDPI 可选引擎
 
 ## 发布
 
-- [ ] `cargo build --release` 产物说明
-- [ ] Linux amd64/arm64 发布（若做 CI 发布）
+- [x] `cargo build --release` 产物说明（`docs/install.md`）
+- [ ] Linux amd64/arm64 CI 发布产物
 - [ ] 覆盖率门禁（需要时再加，不阻塞 v5 回放闭环）

@@ -49,7 +49,7 @@ fn e2e_replay_lan_https() {
     fs::write(&pkt_path, v5::encode(lan_https().unix_secs, &[lan_https()])).unwrap();
     let data = tmp.path().join("data");
     let mut store = Store::new(&data, 7, "replay");
-    replay_file(&mut store, &pkt_path).unwrap();
+    replay_file(&mut store, &pkt_path, &Hints::default()).unwrap();
 
     let day = "2024-01-01";
     let clients = fs::read_to_string(data.join(day).join("clients.jsonl")).unwrap();
@@ -112,11 +112,13 @@ fn e2e_replay_cli_writes_data() {
 fn e2e_listen_invalid_addr_fails() {
     let tmp = tempfile::tempdir().unwrap();
     let mut store = Store::new(tmp.path(), 7, "bad");
+    let mut hints = Hints::default();
     let err = rosflowd::pipeline::listen_udp(
         &mut store,
         "not-a-socket",
         1,
         Arc::new(AtomicBool::new(false)),
+        &mut hints,
     )
     .unwrap_err();
     let msg = err.to_string();
@@ -163,7 +165,7 @@ fn e2e_replay_v9_lan_https() {
     .unwrap();
     let data = tmp.path().join("data");
     let mut store = Store::new(&data, 7, "replay");
-    replay_file(&mut store, &pkt_path).unwrap();
+    replay_file(&mut store, &pkt_path, &Hints::default()).unwrap();
     let clients = fs::read_to_string(data.join("2024-01-01").join("clients.jsonl")).unwrap();
     assert!(clients.contains("10.0.0.95"));
     let apps = fs::read_to_string(data.join("2024-01-01").join("apps.jsonl")).unwrap();
@@ -181,7 +183,7 @@ fn e2e_replay_ipfix_lan_https() {
     .unwrap();
     let data = tmp.path().join("data");
     let mut store = Store::new(&data, 7, "replay");
-    replay_file(&mut store, &pkt_path).unwrap();
+    replay_file(&mut store, &pkt_path, &Hints::default()).unwrap();
     let clients = fs::read_to_string(data.join("2024-01-01").join("clients.jsonl")).unwrap();
     assert!(clients.contains("10.0.0.95"));
 }
@@ -198,7 +200,8 @@ fn e2e_udp_v5_happy_path() {
     let data_thread = data.clone();
     let handle = thread::spawn(move || {
         let mut store = Store::new(&data_thread, 7, local.to_string());
-        serve_udp(&mut store, sock, None, 0, sd)
+        let mut hints = Hints::default();
+        serve_udp(&mut store, sock, None, 0, sd, &mut hints)
     });
     let client = UdpSocket::bind("127.0.0.1:0").unwrap();
     let mut flow = lan_https();
@@ -305,4 +308,68 @@ fn e2e_dhcp_ack_attaches_hostname() {
     let clients = fs::read_to_string(tmp.path().join("2024-01-01").join("clients.jsonl")).unwrap();
     assert!(clients.contains("phone"), "got {clients}");
     assert!(clients.contains("02:00:00:00:00:01"), "got {clients}");
+}
+
+#[test]
+fn e2e_quic_sni_classifies_later_flow() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut store = Store::new(tmp.path(), 7, "replay");
+    let mut decoder = Decoder::default();
+    let mut hints = Hints::default();
+    let dcid = [1u8, 2, 3, 4, 5, 6, 7, 8];
+    let quic = rosflowd::quic::encode_client_initial("quic.example", &dcid).unwrap();
+    let frame = rosflowd::packet::ethernet_ipv4(
+        [0x02, 0, 0, 0, 0, 1],
+        17,
+        Ipv4Addr::new(10, 0, 0, 95),
+        Ipv4Addr::new(1, 1, 1, 1),
+        50000,
+        443,
+        &quic,
+    );
+    process_tzsp(
+        &mut store,
+        &mut hints,
+        &rosflowd::tzsp::encode_ethernet(&frame),
+    );
+    let mut flow = lan_https();
+    flow.proto = 17;
+    flow.dst_port = 443;
+    let pkt = v5::encode(flow.unix_secs, std::slice::from_ref(&flow));
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
+    store.flush().unwrap();
+    let apps = fs::read_to_string(tmp.path().join("2024-01-01").join("apps.jsonl")).unwrap();
+    assert!(apps.contains("quic.example"), "got {apps}");
+    assert!(apps.contains("\"confidence\":\"sni\""), "got {apps}");
+}
+
+#[test]
+fn e2e_identity_sidecar_ssid() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = tmp.path().join("id.jsonl");
+    fs::write(
+        &id,
+        r#"{"ip":"10.0.0.95","ssid":"a2","hostname":"Xiaomi-15-Ultra"}
+"#,
+    )
+    .unwrap();
+    let pkt = tmp.path().join("p.bin");
+    fs::write(&pkt, v5::encode(lan_https().unix_secs, &[lan_https()])).unwrap();
+    let data = tmp.path().join("out");
+    let exe = env!("CARGO_BIN_EXE_rosflowd");
+    let status = std::process::Command::new(exe)
+        .args([
+            "--replay",
+            pkt.to_str().unwrap(),
+            "--identity",
+            id.to_str().unwrap(),
+            "--data",
+            data.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let clients = fs::read_to_string(data.join("2024-01-01").join("clients.jsonl")).unwrap();
+    assert!(clients.contains("\"ssid\":\"a2\""), "got {clients}");
+    assert!(clients.contains("Xiaomi-15-Ultra"), "got {clients}");
 }

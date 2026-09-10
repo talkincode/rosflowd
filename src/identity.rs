@@ -6,6 +6,7 @@ use crate::flow::Flow;
 pub struct ClientIdentity {
     pub mac: Option<String>,
     pub hostname: Option<String>,
+    pub ssid: Option<String>,
 }
 
 pub fn format_mac(bytes: &[u8]) -> Option<String> {
@@ -33,6 +34,18 @@ pub fn client_ip(src: Ipv4Addr, dst: Ipv4Addr) -> Option<Ipv4Addr> {
 
 pub fn client_ip_for_flow(flow: &Flow) -> Option<Ipv4Addr> {
     client_ip(flow.src, flow.dst)
+}
+
+pub fn merge_identity(dst: &mut ClientIdentity, src: ClientIdentity) {
+    if src.mac.is_some() {
+        dst.mac = src.mac;
+    }
+    if src.hostname.is_some() {
+        dst.hostname = src.hostname;
+    }
+    if src.ssid.is_some() {
+        dst.ssid = src.ssid;
+    }
 }
 
 pub fn is_rfc1918(ip: Ipv4Addr) -> bool {

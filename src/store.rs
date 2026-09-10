@@ -47,6 +47,7 @@ struct ClientAgg {
     flows: u64,
     mac: Option<String>,
     hostname: Option<String>,
+    ssid: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -127,6 +128,9 @@ impl Store {
                 if ident.hostname.is_some() {
                     agg.hostname.clone_from(&ident.hostname);
                 }
+                if ident.ssid.is_some() {
+                    agg.ssid.clone_from(&ident.ssid);
+                }
             }
         }
     }
@@ -157,6 +161,9 @@ impl Store {
             }
             if ident.hostname.is_some() {
                 c.hostname.clone_from(&ident.hostname);
+            }
+            if ident.ssid.is_some() {
+                c.ssid.clone_from(&ident.ssid);
             }
         }
         let a = self
@@ -224,6 +231,7 @@ impl Store {
                 client_ip: ip.to_string(),
                 mac: agg.mac.clone(),
                 hostname: agg.hostname.clone(),
+                ssid: agg.ssid.clone(),
                 bytes: agg.bytes,
                 packets: agg.packets,
                 flows: agg.flows,
@@ -351,6 +359,8 @@ struct ClientRow {
     mac: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ssid: Option<String>,
     bytes: u64,
     packets: u64,
     flows: u64,

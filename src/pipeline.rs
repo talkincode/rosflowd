@@ -13,6 +13,7 @@ use crate::hints::Hints;
 use crate::identity::client_ip;
 use crate::netflow::Decoder;
 use crate::packet;
+use crate::quic;
 use crate::sni;
 use crate::store::Store;
 use crate::tzsp;
@@ -51,7 +52,14 @@ pub fn process_tzsp(store: &mut Store, hints: &mut Hints, datagram: &[u8]) {
             hints.remember_identity(ip, ident);
         }
     }
-    if let Some(name) = sni::client_hello_sni(&l4.payload) {
+    let sni_name = sni::client_hello_sni(&l4.payload).or_else(|| {
+        if l4.proto == 17 {
+            quic::client_initial_sni(&l4.payload)
+        } else {
+            None
+        }
+    });
+    if let Some(name) = sni_name {
         store.note_sni();
         if let Some(client) = client_ip(l4.src, l4.dst) {
             let server = if l4.src == client { l4.dst } else { l4.src };
@@ -65,12 +73,17 @@ pub fn process_tzsp(store: &mut Store, hints: &mut Hints, datagram: &[u8]) {
     }
 }
 
-pub fn replay_file(store: &mut Store, path: &Path) -> Result<()> {
+pub fn replay_file(store: &mut Store, path: &Path, hints: &Hints) -> Result<()> {
     let mut decoder = Decoder::default();
-    let hints = Hints::default();
     let bytes = fs::read(path)?;
-    process_datagram(store, &mut decoder, &hints, &bytes);
+    process_datagram(store, &mut decoder, hints, &bytes);
     store.flush()
+}
+
+pub fn replay_tzsp_file(store: &mut Store, hints: &mut Hints, path: &Path) -> Result<()> {
+    let bytes = fs::read(path)?;
+    process_tzsp(store, hints, &bytes);
+    Ok(())
 }
 
 pub fn listen_udp(
@@ -78,9 +91,10 @@ pub fn listen_udp(
     addr: &str,
     flush_secs: u64,
     shutdown: Arc<AtomicBool>,
+    hints: &mut Hints,
 ) -> Result<()> {
     let sock = UdpSocket::bind(addr)?;
-    serve_udp(store, sock, None, flush_secs, shutdown)
+    serve_udp(store, sock, None, flush_secs, shutdown, hints)
 }
 
 pub fn serve_udp(
@@ -89,13 +103,13 @@ pub fn serve_udp(
     tzsp: Option<UdpSocket>,
     flush_secs: u64,
     shutdown: Arc<AtomicBool>,
+    hints: &mut Hints,
 ) -> Result<()> {
     sock.set_read_timeout(Some(Duration::from_millis(50)))?;
     if let Some(ref tz) = tzsp {
         tz.set_nonblocking(true)?;
     }
     let mut decoder = Decoder::default();
-    let mut hints = Hints::default();
     let mut buf = [0u8; 65535];
     let mut idle_ticks = 0u64;
     let flush_ticks = flush_secs.saturating_mul(20).max(1);
@@ -108,7 +122,7 @@ pub fn serve_udp(
         }
         match sock.recv_from(&mut buf) {
             Ok((n, _)) => {
-                process_datagram(store, &mut decoder, &hints, &buf[..n]);
+                process_datagram(store, &mut decoder, hints, &buf[..n]);
                 if flush_secs == 0 {
                     store.flush()?;
                 }
@@ -121,7 +135,7 @@ pub fn serve_udp(
         if let Some(ref tz) = tzsp {
             loop {
                 match tz.recv_from(&mut buf) {
-                    Ok((n, _)) => process_tzsp(store, &mut hints, &buf[..n]),
+                    Ok((n, _)) => process_tzsp(store, hints, &buf[..n]),
                     Err(err)
                         if err.kind() == std::io::ErrorKind::WouldBlock
                             || err.kind() == std::io::ErrorKind::TimedOut =>

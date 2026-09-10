@@ -5,7 +5,9 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use clap::Parser;
-use rosflowd::pipeline::{listen_udp, replay_file, serve_udp};
+use rosflowd::hints::Hints;
+use rosflowd::pipeline::{listen_udp, replay_file, replay_tzsp_file, serve_udp};
+use rosflowd::sidecar;
 use rosflowd::store::Store;
 
 #[derive(Debug, Parser)]
@@ -26,6 +28,12 @@ struct Cli {
     /// Optional TZSP listen address (MikroTik packet-sniffer streaming). Off if omitted.
     #[arg(long)]
     tzsp: Option<String>,
+    /// Replay a TZSP datagram file (no UDP). Can combine with --replay.
+    #[arg(long)]
+    replay_tzsp: Option<PathBuf>,
+    /// JSONL sidecar: {"ip","mac?","hostname?","ssid?"} from wireless/DHCP dumps.
+    #[arg(long)]
+    identity: Option<PathBuf>,
 }
 
 fn main() -> ExitCode {
@@ -49,8 +57,19 @@ fn run(cli: Cli) -> rosflowd::Result<()> {
         cli.listen.clone()
     };
     let mut store = Store::new(&cli.data, cli.retain_days, listen_label);
-    if let Some(path) = cli.replay {
-        replay_file(&mut store, &path)?;
+    let mut hints = Hints::default();
+    if let Some(path) = &cli.identity {
+        sidecar::load_identity_jsonl(path, &mut store, &mut hints)?;
+    }
+    if let Some(path) = &cli.replay_tzsp {
+        replay_tzsp_file(&mut store, &mut hints, path)?;
+    }
+    if let Some(path) = &cli.replay {
+        replay_file(&mut store, path, &hints)?;
+        return Ok(());
+    }
+    if cli.replay_tzsp.is_some() {
+        store.flush()?;
         return Ok(());
     }
     let shutdown = Arc::new(AtomicBool::new(false));
@@ -58,7 +77,7 @@ fn run(cli: Cli) -> rosflowd::Result<()> {
         store.set_tzsp(&tzsp);
         let nf = UdpSocket::bind(&cli.listen)?;
         let tz = UdpSocket::bind(&tzsp)?;
-        return serve_udp(&mut store, nf, Some(tz), 5, shutdown);
+        return serve_udp(&mut store, nf, Some(tz), 5, shutdown, &mut hints);
     }
-    listen_udp(&mut store, &cli.listen, 5, shutdown)
+    listen_udp(&mut store, &cli.listen, 5, shutdown, &mut hints)
 }

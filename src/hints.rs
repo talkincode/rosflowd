@@ -24,12 +24,7 @@ impl Hints {
 
     pub fn remember_identity(&mut self, ip: Ipv4Addr, ident: ClientIdentity) {
         let entry = self.identity.entry(ip).or_default();
-        if ident.mac.is_some() {
-            entry.mac = ident.mac;
-        }
-        if ident.hostname.is_some() {
-            entry.hostname = ident.hostname;
-        }
+        crate::identity::merge_identity(entry, ident);
     }
 
     pub fn sni_for(&self, flow: &Flow) -> Option<&str> {

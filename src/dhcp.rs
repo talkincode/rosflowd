@@ -57,6 +57,7 @@ pub fn parse_ack(payload: &[u8]) -> Option<(Ipv4Addr, ClientIdentity)> {
         ClientIdentity {
             mac: Some(mac),
             hostname,
+            ssid: None,
         },
     ))
 }

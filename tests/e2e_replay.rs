@@ -9,8 +9,9 @@ use std::time::{Duration, Instant};
 use rosflowd::clock::day_utc;
 
 use rosflowd::flow::Flow;
+use rosflowd::hints::Hints;
 use rosflowd::netflow::{ipfix, v5, v9, Decoder};
-use rosflowd::pipeline::{process_datagram, replay_file, serve_udp};
+use rosflowd::pipeline::{process_datagram, process_tzsp, replay_file, serve_udp};
 use rosflowd::store::Store;
 
 fn lan_https() -> Flow {
@@ -71,7 +72,8 @@ fn e2e_wan_only_has_no_client() {
     let mut store = Store::new(tmp.path(), 7, "replay");
     let pkt = v5::encode(wan_only().unix_secs, &[wan_only()]);
     let mut decoder = Decoder::default();
-    process_datagram(&mut store, &mut decoder, &pkt);
+    let hints = Hints::default();
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
     store.flush().unwrap();
     assert_eq!(store.stats().no_client, 1);
     assert_eq!(store.stats().flows, 1);
@@ -138,7 +140,8 @@ fn e2e_unwritable_data_dir_fails_cleanly() {
     let mut store = Store::new(&data, 7, "replay");
     let pkt = v5::encode(lan_https().unix_secs, &[lan_https()]);
     let mut decoder = Decoder::default();
-    process_datagram(&mut store, &mut decoder, &pkt);
+    let hints = Hints::default();
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
     let mut perms = fs::metadata(&data).unwrap().permissions();
     perms.set_mode(0o555);
     fs::set_permissions(&data, perms).unwrap();
@@ -195,7 +198,7 @@ fn e2e_udp_v5_happy_path() {
     let data_thread = data.clone();
     let handle = thread::spawn(move || {
         let mut store = Store::new(&data_thread, 7, local.to_string());
-        serve_udp(&mut store, sock, 0, sd)
+        serve_udp(&mut store, sock, None, 0, sd)
     });
     let client = UdpSocket::bind("127.0.0.1:0").unwrap();
     let mut flow = lan_https();
@@ -218,4 +221,88 @@ fn e2e_udp_v5_happy_path() {
     handle.join().unwrap().unwrap();
     let clients = fs::read_to_string(&clients_path).unwrap();
     assert!(clients.contains("10.0.0.95"), "got {clients}");
+}
+
+#[test]
+fn e2e_tzsp_drop_does_not_change_netflow_bytes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut store = Store::new(tmp.path(), 7, "replay");
+    let mut decoder = Decoder::default();
+    let mut hints = Hints::default();
+    let pkt = v5::encode(lan_https().unix_secs, &[lan_https()]);
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
+    assert_eq!(store.stats().flows, 1);
+    process_tzsp(&mut store, &mut hints, &[0, 1, 2]);
+    assert_eq!(store.stats().dpi_dropped, 1);
+    assert_eq!(store.stats().tzsp_datagrams, 1);
+    assert_eq!(store.stats().flows, 1);
+    store.flush().unwrap();
+    let clients = fs::read_to_string(tmp.path().join("2024-01-01").join("clients.jsonl")).unwrap();
+    assert!(clients.contains("4096"), "got {clients}");
+}
+
+#[test]
+fn e2e_tzsp_sni_classifies_later_flow() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut store = Store::new(tmp.path(), 7, "replay");
+    let mut decoder = Decoder::default();
+    let mut hints = Hints::default();
+    let hello = rosflowd::sni::encode_client_hello("example.com");
+    let frame = rosflowd::packet::ethernet_ipv4(
+        [0x02, 0, 0, 0, 0, 1],
+        6,
+        Ipv4Addr::new(10, 0, 0, 95),
+        Ipv4Addr::new(1, 1, 1, 1),
+        50000,
+        443,
+        &hello,
+    );
+    process_tzsp(
+        &mut store,
+        &mut hints,
+        &rosflowd::tzsp::encode_ethernet(&frame),
+    );
+    let pkt = v5::encode(lan_https().unix_secs, &[lan_https()]);
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
+    store.flush().unwrap();
+    let apps = fs::read_to_string(tmp.path().join("2024-01-01").join("apps.jsonl")).unwrap();
+    assert!(apps.contains("\"app\":\"example.com\""), "got {apps}");
+    assert!(apps.contains("\"confidence\":\"sni\""), "got {apps}");
+    let clients = fs::read_to_string(tmp.path().join("2024-01-01").join("clients.jsonl")).unwrap();
+    assert!(clients.contains("4096"), "got {clients}");
+    let meta: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(tmp.path().join("metadata.json")).unwrap())
+            .unwrap();
+    assert_eq!(meta["dpi"]["engine"], "port");
+    assert_eq!(meta["dpi"]["sni"], true);
+}
+
+#[test]
+fn e2e_dhcp_ack_attaches_hostname() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut store = Store::new(tmp.path(), 7, "replay");
+    let mut decoder = Decoder::default();
+    let mut hints = Hints::default();
+    let ack =
+        rosflowd::dhcp::encode_ack(Ipv4Addr::new(10, 0, 0, 95), [0x02, 0, 0, 0, 0, 1], "phone");
+    let frame = rosflowd::packet::ethernet_ipv4(
+        [0x02, 0, 0, 0, 0, 1],
+        17,
+        Ipv4Addr::new(10, 0, 0, 1),
+        Ipv4Addr::new(10, 0, 0, 95),
+        67,
+        68,
+        &ack,
+    );
+    process_tzsp(
+        &mut store,
+        &mut hints,
+        &rosflowd::tzsp::encode_ethernet(&frame),
+    );
+    let pkt = v5::encode(lan_https().unix_secs, &[lan_https()]);
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
+    store.flush().unwrap();
+    let clients = fs::read_to_string(tmp.path().join("2024-01-01").join("clients.jsonl")).unwrap();
+    assert!(clients.contains("phone"), "got {clients}");
+    assert!(clients.contains("02:00:00:00:00:01"), "got {clients}");
 }

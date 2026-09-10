@@ -19,17 +19,19 @@
 - [x] UDP 真实收包 Happy Path
 - [x] NetFlow v9
 - [x] IPFIX
-- [ ] TZSP 采样 ingest（默关）
-- [ ] 采样丢包不影响 NetFlow 字节计数
+- [x] TZSP 采样 ingest（`--tzsp`，默关）
+- [x] 采样丢包不影响 NetFlow 字节计数
 
 ## 身份与分类
 
 - [x] RFC1918 客户端主键
 - [x] 端口分类 `confidence=port`
-- [ ] DHCP lease 关联 MAC/hostname
+- [x] DHCP ACK 关联 MAC/hostname
 - [ ] wireless registration 关联 SSID
-- [ ] TLS/QUIC SNI（纯 Rust）
-- [ ] nDPI 可选引擎，`metadata.json.dpi.engine` 如实声明
+- [x] TLS SNI（纯 Rust）
+- [ ] QUIC SNI
+- [x] `dpi.engine` 如实为 `port`（未接 nDPI）
+- [ ] nDPI 可选引擎
 
 ## 发布
 

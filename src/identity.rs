@@ -2,6 +2,22 @@ use std::net::Ipv4Addr;
 
 use crate::flow::Flow;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClientIdentity {
+    pub mac: Option<String>,
+    pub hostname: Option<String>,
+}
+
+pub fn format_mac(bytes: &[u8]) -> Option<String> {
+    if bytes.len() < 6 {
+        return None;
+    }
+    Some(format!(
+        "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]
+    ))
+}
+
 /// LAN client key: RFC1918 source, else RFC1918 destination.
 /// WAN-only (neither side private) returns None — never invent a client.
 /// CGNAT `100.64/10` is intentionally excluded.

@@ -16,11 +16,14 @@ rosflowd --replay testdata/example.nfv5 --data ./data
 
 # 监听（RouterOS /ip traffic-flow 指向此地址）
 rosflowd --listen 0.0.0.0:2055 --data ./data --retain-days 7
+
+# 可选：同机再听 TZSP（MikroTik /tool sniffer streaming），默关
+rosflowd --listen 0.0.0.0:2055 --tzsp 0.0.0.0:37008 --data ./data
 ```
 
 采集必须来自 **LAN 桥**。WAN 口导出的流在 NAT 之后，无法对应到家里的客户端。
 
-当前分类是知名端口（L2），不是 DPI。已解码 NetFlow v5/v9 与 IPFIX。TZSP/nDPI 未实现。
+当前分类是知名端口（L2）；TZSP 样本可补 TLS SNI（`confidence=sni`），**不是** DPI。nDPI 未实现。已解码 NetFlow v5/v9 与 IPFIX。
 
 ## 数据目录
 

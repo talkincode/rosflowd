@@ -2,9 +2,9 @@ use crate::flow::Flow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Classification {
-    pub app: &'static str,
-    pub category: &'static str,
-    pub confidence: &'static str,
+    pub app: String,
+    pub category: String,
+    pub confidence: String,
     pub evidence: String,
 }
 
@@ -29,17 +29,17 @@ pub fn classify(flow: &Flow) -> Classification {
         (17, 161) => ("snmp", "mgmt"),
         _ => {
             return Classification {
-                app: "unknown",
-                category: "unknown",
-                confidence: "unknown",
+                app: "unknown".into(),
+                category: "unknown".into(),
+                confidence: "unknown".into(),
                 evidence: format!("proto={}/port={}", flow.proto, port),
             };
         }
     };
     Classification {
-        app,
-        category,
-        confidence: "port",
+        app: app.into(),
+        category: category.into(),
+        confidence: "port".into(),
         evidence: format!("proto={}/port={port}", flow.proto),
     }
 }

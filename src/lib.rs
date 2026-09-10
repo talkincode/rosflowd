@@ -1,13 +1,18 @@
 pub mod classify;
 pub mod clock;
+pub mod dhcp;
 pub mod error;
 pub mod flow;
+pub mod hints;
 pub mod identity;
 pub mod netflow;
+pub mod packet;
 pub mod pipeline;
+pub mod sni;
 pub mod store;
+pub mod tzsp;
 
 pub use error::{Error, Result};
 pub use netflow::Decoder;
-pub use pipeline::{process_datagram, replay_file, serve_udp};
+pub use pipeline::{process_datagram, process_tzsp, replay_file, serve_udp};
 pub use store::Store;

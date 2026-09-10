@@ -43,7 +43,9 @@
 - RFC1918 客户端主键；WAN-only 流不进入 `clients.jsonl`。证据：`src/identity.rs`，`tests/e2e_replay.rs`。
 - 按日写入 `clients.jsonl` / `apps.jsonl` / `hourly.json` / `ingest.json`，根目录 `metadata.json` 与 `README.md`。证据：`src/store.rs`。
 - 保留最近 N 个日历日（默认 7），删除更旧日目录。证据：`src/store.rs` 保留测试。
-- TZSP 采样、nDPI、DHCP/Wi-Fi 关联：**未实现**。
+- TZSP 采样 ingest（`--tzsp`，默关）：解析以太网帧，提取 TLS SNI / DHCP ACK；失败只增加 `dpi_dropped`，不改 NetFlow 字节。证据：`e2e_tzsp_sni_classifies_later_flow`、`e2e_tzsp_drop_does_not_change_netflow_bytes`。
+- DHCP ACK → MAC/hostname 写入 `clients.jsonl`。证据：`e2e_dhcp_ack_attaches_hostname`。
+- nDPI、wireless SSID、QUIC SNI：**未实现**。
 
 ## 非目标（铁律）
 
@@ -92,7 +94,10 @@
 | 日文件落盘 | 中 | ✅ | ✅ 目录不可写 | 不适用 | ✅ 原子替换失败不留半截真文件 | `store` 单测；`e2e_replay_lan_https` |
 | 7 日保留 | 中 | ✅ | ✅ 8 日后只剩 7 天 | 不适用 | ✅ 只删过期日目录 | `store::retention_keeps_last_n_days` |
 | UDP 监听 | 中 | ✅ | ✅ 无效地址绑定失败 | 不适用 | 不适用（失败则不进入收包循环） | `e2e_udp_v5_happy_path`；`e2e_listen_invalid_addr_fails` |
-| TZSP / DPI | 高 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用 | 未实现；启用前必须有 golden pcap E2E |
+| TZSP 采样 | 高 | ✅ | ✅ 坏包 `dpi_dropped` 且字节不变 | 不适用 | ✅ 不回写 NetFlow 计数 | `e2e_tzsp_sni_classifies_later_flow`；`e2e_tzsp_drop_does_not_change_netflow_bytes` |
+| TLS SNI | 中 | ✅ | ✅ 非 TLS payload 忽略 | 不适用 | 不适用 | `sni` 单测；`e2e_tzsp_sni_classifies_later_flow` |
+| DHCP 身份 | 中 | ✅ | 不适用（非 ACK 忽略） | 不适用 | ✅ 迟到 ACK 可回填已有客户端 | `e2e_dhcp_ack_attaches_hostname` |
+| nDPI | 高 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用 | 未实现；`dpi.engine` 不得写成 `ndpi` |
 | IPFIX / NetFlow v9 | 中 | ✅ | ✅ 缺模板不计流；IPFIX 长度不符 | 不适用 | 不适用 | `e2e_replay_v9_lan_https`；`e2e_replay_ipfix_lan_https`；`v9::data_without_template_yields_no_flows` |
 
-DPI 在有 golden 包之前不得打开默认引擎。
+nDPI 在有 golden 包与可选引擎之前不得打开默认引擎。`dpi.engine` 仍为 `port`；SNI 只用 `dpi.sni=true` 与 `confidence=sni` 声明。

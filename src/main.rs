@@ -1,10 +1,11 @@
+use std::net::UdpSocket;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use clap::Parser;
-use rosflowd::pipeline::{listen_udp, replay_file};
+use rosflowd::pipeline::{listen_udp, replay_file, serve_udp};
 use rosflowd::store::Store;
 
 #[derive(Debug, Parser)]
@@ -22,6 +23,9 @@ struct Cli {
     /// Replay a single datagram file and exit (no UDP)
     #[arg(long)]
     replay: Option<PathBuf>,
+    /// Optional TZSP listen address (MikroTik packet-sniffer streaming). Off if omitted.
+    #[arg(long)]
+    tzsp: Option<String>,
 }
 
 fn main() -> ExitCode {
@@ -49,5 +53,12 @@ fn run(cli: Cli) -> rosflowd::Result<()> {
         replay_file(&mut store, &path)?;
         return Ok(());
     }
-    listen_udp(&mut store, &cli.listen, 5, Arc::new(AtomicBool::new(false)))
+    let shutdown = Arc::new(AtomicBool::new(false));
+    if let Some(tzsp) = cli.tzsp {
+        store.set_tzsp(&tzsp);
+        let nf = UdpSocket::bind(&cli.listen)?;
+        let tz = UdpSocket::bind(&tzsp)?;
+        return serve_udp(&mut store, nf, Some(tz), 5, shutdown);
+    }
+    listen_udp(&mut store, &cli.listen, 5, shutdown)
 }

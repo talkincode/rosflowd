@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use clap::Parser;
 use rosflowd::pipeline::{listen_udp, replay_file};
@@ -47,5 +49,5 @@ fn run(cli: Cli) -> rosflowd::Result<()> {
         replay_file(&mut store, &path)?;
         return Ok(());
     }
-    listen_udp(&mut store, &cli.listen, 5)
+    listen_udp(&mut store, &cli.listen, 5, Arc::new(AtomicBool::new(false)))
 }

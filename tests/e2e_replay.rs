@@ -1,10 +1,16 @@
 use std::fs;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, UdpSocket};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
+
+use rosflowd::clock::day_utc;
 
 use rosflowd::flow::Flow;
-use rosflowd::netflow::v5;
-use rosflowd::pipeline::{process_datagram, replay_file};
+use rosflowd::netflow::{ipfix, v5, v9, Decoder};
+use rosflowd::pipeline::{process_datagram, replay_file, serve_udp};
 use rosflowd::store::Store;
 
 fn lan_https() -> Flow {
@@ -64,7 +70,8 @@ fn e2e_wan_only_has_no_client() {
     let tmp = tempfile::tempdir().unwrap();
     let mut store = Store::new(tmp.path(), 7, "replay");
     let pkt = v5::encode(wan_only().unix_secs, &[wan_only()]);
-    process_datagram(&mut store, &pkt);
+    let mut decoder = Decoder::default();
+    process_datagram(&mut store, &mut decoder, &pkt);
     store.flush().unwrap();
     assert_eq!(store.stats().no_client, 1);
     assert_eq!(store.stats().flows, 1);
@@ -103,7 +110,13 @@ fn e2e_replay_cli_writes_data() {
 fn e2e_listen_invalid_addr_fails() {
     let tmp = tempfile::tempdir().unwrap();
     let mut store = Store::new(tmp.path(), 7, "bad");
-    let err = rosflowd::pipeline::listen_udp(&mut store, "not-a-socket", 1).unwrap_err();
+    let err = rosflowd::pipeline::listen_udp(
+        &mut store,
+        "not-a-socket",
+        1,
+        Arc::new(AtomicBool::new(false)),
+    )
+    .unwrap_err();
     let msg = err.to_string();
     assert!(
         msg.contains("not-a-socket")
@@ -124,7 +137,8 @@ fn e2e_unwritable_data_dir_fails_cleanly() {
     fs::create_dir(&data).unwrap();
     let mut store = Store::new(&data, 7, "replay");
     let pkt = v5::encode(lan_https().unix_secs, &[lan_https()]);
-    process_datagram(&mut store, &pkt);
+    let mut decoder = Decoder::default();
+    process_datagram(&mut store, &mut decoder, &pkt);
     let mut perms = fs::metadata(&data).unwrap().permissions();
     perms.set_mode(0o555);
     fs::set_permissions(&data, perms).unwrap();
@@ -133,4 +147,75 @@ fn e2e_unwritable_data_dir_fails_cleanly() {
     perms.set_mode(0o755);
     fs::set_permissions(&data, perms).unwrap();
     assert!(result.is_err(), "flush should fail on read-only dir");
+}
+
+#[test]
+fn e2e_replay_v9_lan_https() {
+    let tmp = tempfile::tempdir().unwrap();
+    let pkt_path = tmp.path().join("lan.nfv9");
+    fs::write(
+        &pkt_path,
+        v9::encode(lan_https().unix_secs, 1, &[lan_https()]),
+    )
+    .unwrap();
+    let data = tmp.path().join("data");
+    let mut store = Store::new(&data, 7, "replay");
+    replay_file(&mut store, &pkt_path).unwrap();
+    let clients = fs::read_to_string(data.join("2024-01-01").join("clients.jsonl")).unwrap();
+    assert!(clients.contains("10.0.0.95"));
+    let apps = fs::read_to_string(data.join("2024-01-01").join("apps.jsonl")).unwrap();
+    assert!(apps.contains("\"app\":\"tls\""));
+}
+
+#[test]
+fn e2e_replay_ipfix_lan_https() {
+    let tmp = tempfile::tempdir().unwrap();
+    let pkt_path = tmp.path().join("lan.ipfix");
+    fs::write(
+        &pkt_path,
+        ipfix::encode(lan_https().unix_secs, 1, &[lan_https()]),
+    )
+    .unwrap();
+    let data = tmp.path().join("data");
+    let mut store = Store::new(&data, 7, "replay");
+    replay_file(&mut store, &pkt_path).unwrap();
+    let clients = fs::read_to_string(data.join("2024-01-01").join("clients.jsonl")).unwrap();
+    assert!(clients.contains("10.0.0.95"));
+}
+
+#[test]
+fn e2e_udp_v5_happy_path() {
+    let tmp = tempfile::tempdir().unwrap();
+    let data = tmp.path().join("data");
+    fs::create_dir(&data).unwrap();
+    let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let local = sock.local_addr().unwrap();
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let sd = shutdown.clone();
+    let data_thread = data.clone();
+    let handle = thread::spawn(move || {
+        let mut store = Store::new(&data_thread, 7, local.to_string());
+        serve_udp(&mut store, sock, 0, sd)
+    });
+    let client = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let mut flow = lan_https();
+    flow.unix_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u32;
+    let day = day_utc(flow.unix_secs);
+    let pkt = v5::encode(flow.unix_secs, std::slice::from_ref(&flow));
+    client.send_to(&pkt, local).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let clients_path = data.join(&day).join("clients.jsonl");
+    while Instant::now() < deadline {
+        if clients_path.exists() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    shutdown.store(true, Ordering::SeqCst);
+    handle.join().unwrap().unwrap();
+    let clients = fs::read_to_string(&clients_path).unwrap();
+    assert!(clients.contains("10.0.0.95"), "got {clients}");
 }

@@ -20,7 +20,7 @@ rosflowd --listen 0.0.0.0:2055 --data ./data --retain-days 7
 
 采集必须来自 **LAN 桥**。WAN 口导出的流在 NAT 之后，无法对应到家里的客户端。
 
-当前分类是知名端口（L2），不是 DPI。TZSP/nDPI 未实现。
+当前分类是知名端口（L2），不是 DPI。已解码 NetFlow v5/v9 与 IPFIX。TZSP/nDPI 未实现。
 
 ## 数据目录
 

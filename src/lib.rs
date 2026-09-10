@@ -8,5 +8,6 @@ pub mod pipeline;
 pub mod store;
 
 pub use error::{Error, Result};
-pub use pipeline::{process_datagram, replay_file};
+pub use netflow::Decoder;
+pub use pipeline::{process_datagram, replay_file, serve_udp};
 pub use store::Store;

@@ -16,9 +16,9 @@
 - [x] NetFlow v5 解码 + 回放
 - [x] UDP 无效地址绑定失败
 - [x] `--replay` 不打开 UDP
-- [ ] UDP 真实收包 Happy Path
-- [ ] NetFlow v9
-- [ ] IPFIX
+- [x] UDP 真实收包 Happy Path
+- [x] NetFlow v9
+- [x] IPFIX
 - [ ] TZSP 采样 ingest（默关）
 - [ ] 采样丢包不影响 NetFlow 字节计数
 

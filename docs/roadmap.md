@@ -37,11 +37,13 @@
 ## 当前能力清单
 
 - NetFlow v5 UDP/回放解码并规范化为 flow 记录。证据：`src/netflow/v5.rs`，`tests/e2e_replay.rs`。
+- NetFlow v9 / IPFIX（模板缓存，缺模板的 data set 不计流）。证据：`src/netflow/v9.rs`、`src/netflow/ipfix.rs`，`e2e_replay_v9_lan_https` / `e2e_replay_ipfix_lan_https`。
+- UDP 监听收包（可 shutdown）。证据：`e2e_udp_v5_happy_path`。
 - 基于知名端口的 L2 分类（`confidence=port`）。证据：`src/classify.rs`。
 - RFC1918 客户端主键；WAN-only 流不进入 `clients.jsonl`。证据：`src/identity.rs`，`tests/e2e_replay.rs`。
 - 按日写入 `clients.jsonl` / `apps.jsonl` / `hourly.json` / `ingest.json`，根目录 `metadata.json` 与 `README.md`。证据：`src/store.rs`。
 - 保留最近 N 个日历日（默认 7），删除更旧日目录。证据：`src/store.rs` 保留测试。
-- TZSP 采样、nDPI、IPFIX/NetFlow v9、DHCP/Wi-Fi 关联：**未实现**。
+- TZSP 采样、nDPI、DHCP/Wi-Fi 关联：**未实现**。
 
 ## 非目标（铁律）
 
@@ -89,8 +91,8 @@
 | 端口分类 | 低 | ✅ | ✅ 未知端口 → unknown | 不适用 | 不适用 | `classify` 单测 |
 | 日文件落盘 | 中 | ✅ | ✅ 目录不可写 | 不适用 | ✅ 原子替换失败不留半截真文件 | `store` 单测；`e2e_replay_lan_https` |
 | 7 日保留 | 中 | ✅ | ✅ 8 日后只剩 7 天 | 不适用 | ✅ 只删过期日目录 | `store::retention_keeps_last_n_days` |
-| UDP 监听 | 中 | ❌ 缺口 | ✅ 无效地址绑定失败 | 不适用 | 不适用（失败则不进入收包循环） | `e2e_listen_invalid_addr_fails`；Happy Path 待补真实收包 |
+| UDP 监听 | 中 | ✅ | ✅ 无效地址绑定失败 | 不适用 | 不适用（失败则不进入收包循环） | `e2e_udp_v5_happy_path`；`e2e_listen_invalid_addr_fails` |
 | TZSP / DPI | 高 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用 | 未实现；启用前必须有 golden pcap E2E |
-| IPFIX / NetFlow v9 | 中 | ❌ 缺口 | ✅ 非 v5 版本报错 | 不适用 | 不适用 | `netflow::v5::rejects_other_versions` |
+| IPFIX / NetFlow v9 | 中 | ✅ | ✅ 缺模板不计流；IPFIX 长度不符 | 不适用 | 不适用 | `e2e_replay_v9_lan_https`；`e2e_replay_ipfix_lan_https`；`v9::data_without_template_yields_no_flows` |
 
-UDP 监听缺口的最低期望：增加「无效地址绑定失败」与「`--replay` 不打开 UDP」的测试后再称为已交付。DPI 在有 golden 包之前不得打开默认引擎。
+DPI 在有 golden 包之前不得打开默认引擎。

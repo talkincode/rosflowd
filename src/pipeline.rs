@@ -140,8 +140,7 @@ pub fn serve_udp(
     }
     let mut decoder = Decoder::default();
     let mut buf = [0u8; 65535];
-    let mut idle_ticks = 0u64;
-    let flush_ticks = flush_secs.saturating_mul(20).max(1);
+    let mut last_flush = std::time::Instant::now();
     loop {
         if shutdown.load(Ordering::SeqCst) {
             store.flush()?;
@@ -154,8 +153,8 @@ pub fn serve_udp(
                 process_datagram(store, &mut decoder, hints, &buf[..n]);
                 if flush_secs == 0 {
                     store.flush()?;
+                    last_flush = std::time::Instant::now();
                 }
-                idle_ticks = 0;
             }
             Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {}
             Err(err) if err.kind() == std::io::ErrorKind::TimedOut => {}
@@ -175,12 +174,11 @@ pub fn serve_udp(
                 }
             }
         }
-        idle_ticks += 1;
-        if flush_secs > 0 && idle_ticks >= flush_ticks {
+        if flush_secs > 0 && last_flush.elapsed() >= Duration::from_secs(flush_secs) {
             store.flush()?;
             let now = Utc::now().timestamp() as u32;
             store.prune_now(now)?;
-            idle_ticks = 0;
+            last_flush = std::time::Instant::now();
         }
     }
 }

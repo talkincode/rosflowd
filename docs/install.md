@@ -43,7 +43,7 @@ Tag `v*` on `main` runs `.github/workflows/release.yml` and attaches:
 - `rosflowd-linux-amd64.tar.gz`
 - `rosflowd-linux-arm64.tar.gz`
 
-plus `.sha256` sidecars. Builds are **gnu libc + nDPI 6.0** (not musl). The host needs `libndpi.so.6` at runtime (`scripts/ci-ndpi.sh` or distro package).
+plus `.sha256` sidecars. **v0.2.0+** builds are **gnu libc + nDPI 6.0** (not musl). The host needs `libndpi.so.6` at runtime (`scripts/ci-ndpi.sh` or distro package). `v0.1.0` was musl without nDPI and is not a drop-in replacement.
 
 Manual:
 

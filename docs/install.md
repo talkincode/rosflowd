@@ -2,6 +2,8 @@
 
 ## Local
 
+Needs **nDPI 6.x** + pkg-config (`brew install ndpi` or `scripts/ci-ndpi.sh`). Default builds **dynamically** link `libndpi`.
+
 ```bash
 cargo build --release
 ./target/release/rosflowd --help
@@ -41,11 +43,11 @@ Tag `v*` on `main` runs `.github/workflows/release.yml` and attaches:
 - `rosflowd-linux-amd64.tar.gz`
 - `rosflowd-linux-arm64.tar.gz`
 
-plus `.sha256` sidecars. Builds are musl (`x86_64-unknown-linux-musl` / `aarch64-unknown-linux-musl`).
+plus `.sha256` sidecars. Builds are **gnu libc + nDPI 6.0** (not musl). The host needs `libndpi.so.6` at runtime (`scripts/ci-ndpi.sh` or distro package).
 
 Manual:
 
 ```bash
-cargo build --release --locked --target x86_64-unknown-linux-musl
-cargo build --release --locked --target aarch64-unknown-linux-musl
+bash scripts/ci-ndpi.sh
+cargo build --release --locked
 ```

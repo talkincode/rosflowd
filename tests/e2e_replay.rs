@@ -276,7 +276,7 @@ fn e2e_tzsp_sni_classifies_later_flow() {
     let meta: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(tmp.path().join("metadata.json")).unwrap())
             .unwrap();
-    assert_eq!(meta["dpi"]["engine"], "port");
+    assert_eq!(meta["dpi"]["engine"], "ndpi");
     assert_eq!(meta["dpi"]["sni"], true);
 }
 
@@ -406,6 +406,45 @@ fn e2e_dns_a_classifies_later_flow() {
     let meta: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(tmp.path().join("metadata.json")).unwrap())
             .unwrap();
-    assert_eq!(meta["dpi"]["engine"], "port");
+    assert_eq!(meta["dpi"]["engine"], "ndpi");
     assert_eq!(meta["dpi"]["dns"], true);
+}
+
+#[test]
+fn e2e_ndpi_http_classifies_later_flow() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut store = Store::new(tmp.path(), 7, "replay");
+    let mut decoder = Decoder::default();
+    let mut hints = Hints::default();
+    let http = b"GET / HTTP/1.0\r\nHost: example.com\r\n\r\n";
+    let frame = rosflowd::packet::ethernet_ipv4(
+        [0x02, 0, 0, 0, 0, 1],
+        6,
+        Ipv4Addr::new(10, 0, 0, 95),
+        Ipv4Addr::new(1, 1, 1, 1),
+        50000,
+        80,
+        http,
+    );
+    process_tzsp(
+        &mut store,
+        &mut hints,
+        &rosflowd::tzsp::encode_ethernet(&frame),
+    );
+    let mut flow = lan_https();
+    flow.dst_port = 80;
+    let pkt = v5::encode(flow.unix_secs, std::slice::from_ref(&flow));
+    process_datagram(&mut store, &mut decoder, &hints, &pkt);
+    store.flush().unwrap();
+    let apps = fs::read_to_string(tmp.path().join("2024-01-01").join("apps.jsonl")).unwrap();
+    assert!(apps.contains("\"confidence\":\"ndpi\""), "got {apps}");
+    assert!(
+        apps.to_ascii_lowercase().contains("http"),
+        "expected HTTP-like ndpi app, got {apps}"
+    );
+    let meta: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(tmp.path().join("metadata.json")).unwrap())
+            .unwrap();
+    assert_eq!(meta["dpi"]["engine"], "ndpi");
+    assert_eq!(meta["dpi"]["status"], "dpi");
 }

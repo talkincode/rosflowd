@@ -48,7 +48,7 @@
 - QUIC v1 Initial SNI（解密 CRYPTO 中的 ClientHello）。证据：`src/quic.rs`，`e2e_quic_sni_classifies_later_flow`。
 - `--identity` JSONL sidecar 填 MAC/hostname/SSID（无线注册表由外部 dump，守护进程不登录 ROS）。证据：`e2e_identity_sidecar_ssid`。
 - DNS A 记录（TZSP）把客户端+解析 IP 映射成名字，后续流 `confidence=dns`。证据：`src/dns.rs`，`e2e_dns_a_classifies_later_flow`。
-- nDPI：**未实现**（不把 C/LGPL 库打进默认单二进制；`dpi.engine` 不得写成 `ndpi`）。
+- nDPI 6.x 默认链接：TZSP 采样包进 nDPI，游戏等专用协议 `confidence=ndpi`（Steam/Xbox/PSN/Riot/Epic 等）。证据：`src/ndpi.rs`，`e2e_ndpi_http_classifies_later_flow`。NetFlow 记录本身仍不是 DPI。
 
 ## 非目标（铁律）
 
@@ -103,7 +103,7 @@
 | Identity sidecar | 中 | ✅ | ✅ 坏 JSON 失败 | 不适用 | 不适用 | `sidecar` 单测；`e2e_identity_sidecar_ssid` |
 | DHCP 身份 | 中 | ✅ | 不适用（非 ACK 忽略） | 不适用 | ✅ 迟到 ACK 可回填已有客户端 | `e2e_dhcp_ack_attaches_hostname` |
 | DNS 映射 | 中 | ✅ | ✅ 纯查询无 A 则忽略 | 不适用 | 不适用 | `dns` 单测；`e2e_dns_a_classifies_later_flow` |
-| nDPI | 高 | ❌ 缺口 | 不适用 | 不适用 | 不适用 | 故意不捆绑；`dpi.engine` 不得写成 `ndpi` |
+| nDPI | 高 | ✅ | ✅ 未知协议不覆盖字节 | 不适用 | ✅ 不改 NetFlow 计数 | `e2e_ndpi_http_classifies_later_flow`；`e2e_tzsp_drop_does_not_change_netflow_bytes` |
 | IPFIX / NetFlow v9 | 中 | ✅ | ✅ 缺模板不计流；IPFIX 长度不符 | 不适用 | 不适用 | `e2e_replay_v9_lan_https`；`e2e_replay_ipfix_lan_https`；`v9::data_without_template_yields_no_flows` |
 
-nDPI 在有 golden 包与可选引擎之前不得打开默认引擎。`dpi.engine` 仍为 `port`；SNI 只用 `dpi.sni=true` 与 `confidence=sni` 声明。
+nDPI 只吃 TZSP 采样，不吃 NetFlow。`dpi.engine=ndpi` 表示采样侧已命中；专用协议优先于 SNI/DNS，TLS/HTTP 等泛名仍让位给 SNI/DNS。

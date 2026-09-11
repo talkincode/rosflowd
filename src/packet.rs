@@ -10,7 +10,7 @@ pub struct L4 {
     pub payload: Vec<u8>,
 }
 
-pub fn parse_ipv4_l4(frame: &[u8]) -> Option<L4> {
+pub fn ipv4_l3(frame: &[u8]) -> Option<&[u8]> {
     if frame.len() < 14 {
         return None;
     }
@@ -24,6 +24,14 @@ pub fn parse_ipv4_l4(frame: &[u8]) -> Option<L4> {
         return None;
     }
     let ip = frame.get(etype_off + 2..)?;
+    if ip.len() < 20 || ip[0] >> 4 != 4 {
+        return None;
+    }
+    Some(ip)
+}
+
+pub fn parse_ipv4_l4(frame: &[u8]) -> Option<L4> {
+    let ip = ipv4_l3(frame)?;
     if ip.len() < 20 || ip[0] >> 4 != 4 {
         return None;
     }

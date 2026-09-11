@@ -6,6 +6,7 @@ pub mod error;
 pub mod flow;
 pub mod hints;
 pub mod identity;
+pub mod ndpi;
 pub mod netflow;
 pub mod packet;
 pub mod pipeline;

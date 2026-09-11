@@ -26,7 +26,7 @@ Local rolling stats. Not a database. Default retention is 7 UTC calendar days.
 | `YYYY-MM-DD/hourly.json` | Unix-hour → bytes |
 | `YYYY-MM-DD/ingest.json` | Decode/drop counters |
 
-`confidence=port` is not DPI. `confidence=sni` comes from TZSP samples, not from NetFlow. WAN-only flows are counted in ingest but omitted from clients.jsonl. TZSP decode failures increment `dpi_dropped` and never subtract NetFlow bytes.
+`confidence=port` is not DPI. `confidence=sni`/`dns` come from TZSP samples. `confidence=ndpi` is nDPI on those samples, not on NetFlow records. WAN-only flows are counted in ingest but omitted from clients.jsonl. TZSP decode failures increment `dpi_dropped` and never subtract NetFlow bytes.
 "#;
 
 #[derive(Debug, Default)]
@@ -71,6 +71,7 @@ pub struct Store {
     tzsp: String,
     sni_enabled: bool,
     dns_enabled: bool,
+    ndpi_enabled: bool,
 }
 
 impl Store {
@@ -86,6 +87,7 @@ impl Store {
             tzsp: String::new(),
             sni_enabled: false,
             dns_enabled: false,
+            ndpi_enabled: false,
         }
     }
 
@@ -123,6 +125,10 @@ impl Store {
 
     pub fn note_dns(&mut self) {
         self.dns_enabled = true;
+    }
+
+    pub fn note_ndpi(&mut self) {
+        self.ndpi_enabled = true;
     }
 
     pub fn apply_identity(&mut self, ip: Ipv4Addr, ident: &ClientIdentity) {
@@ -197,8 +203,8 @@ impl Store {
             listen: &self.listen,
             tzsp,
             dpi: DpiMeta {
-                engine: "port",
-                status: "l2",
+                engine: if self.ndpi_enabled { "ndpi" } else { "port" },
+                status: if self.ndpi_enabled { "dpi" } else { "l2" },
                 sni: self.sni_enabled,
                 dns: self.dns_enabled,
             },

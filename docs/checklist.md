@@ -31,11 +31,11 @@
 - [x] TLS SNI（纯 Rust）
 - [x] QUIC v1 Initial SNI
 - [x] DNS A 记录映射 `confidence=dns`（TZSP，非 DPI）
-- [x] `dpi.engine` 如实为 `port`（未接 nDPI）
-- [ ] nDPI 可选引擎（故意未接 C 库；单二进制默认不捆绑 LGPL nDPI）
+- [x] `dpi.engine` 在 TZSP 命中 nDPI 后为 `ndpi`
+- [x] nDPI 默认发布（动态链接 libndpi 6.x；NetFlow 仍不算 DPI）
 
 ## 发布
 
 - [x] `cargo build --release` 产物说明（`docs/install.md`）
-- [x] Linux amd64/arm64 CI 发布产物（tag `v*`）
+- [x] Linux amd64/arm64 CI 发布产物（tag `v*`，gnu + nDPI 6.0）
 - [ ] 覆盖率门禁（需要时再加，不阻塞现有 E2E）

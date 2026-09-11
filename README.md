@@ -26,7 +26,7 @@ rosflowd --replay flow.nfv5 --identity clients.jsonl --data ./data
 
 采集必须来自 **LAN 桥**。WAN 口导出的流在 NAT 之后，无法对应到家里的客户端。
 
-当前分类是知名端口（L2）；TZSP 样本可补 TLS/QUIC SNI（`confidence=sni`）和 DNS A 映射（`confidence=dns`），**都不是** DPI。nDPI 未捆绑。构建与 tag 发布见 [`docs/install.md`](docs/install.md)。
+分类：端口、TLS/QUIC SNI、DNS A，以及 **nDPI**（默认链接 `libndpi` 6.x）对 TZSP 采样包。NetFlow 字节仍不是 DPI。游戏流量走 nDPI（Steam/Xbox/PSN/Riot/Epic 等）。构建见 [`docs/install.md`](docs/install.md)。nDPI 为 LGPLv3，运行时需要 `libndpi`。
 
 ## 数据目录
 

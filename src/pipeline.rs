@@ -82,6 +82,24 @@ pub fn process_tzsp(store: &mut Store, hints: &mut Hints, datagram: &[u8]) {
             hints.remember_sni(client, server, port, name);
         }
     }
+    if let Some(ip) = packet::ipv4_l3(frame) {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        if let Some(hit) = hints.ndpi.inspect(ip, &l4, now_ms) {
+            store.note_ndpi();
+            if let Some(client) = client_ip(l4.src, l4.dst) {
+                let server = if l4.src == client { l4.dst } else { l4.src };
+                let port = if l4.src == client {
+                    l4.dst_port
+                } else {
+                    l4.src_port
+                };
+                hints.remember_ndpi(client, server, port, hit);
+            }
+        }
+    }
 }
 
 pub fn replay_file(store: &mut Store, path: &Path, hints: &Hints) -> Result<()> {

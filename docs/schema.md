@@ -15,4 +15,4 @@ Day files:
 - `hourly.json`: unix-hour string → bytes.
 - `ingest.json`: `datagrams`, `flows`, `decode_errors`, `unsupported_version`, `no_client`, `tzsp_datagrams`, `dpi_dropped`.
 
-`dpi.engine` is `port` until nDPI is wired. SNI uses `dpi.sni=true` and `confidence=sni`. DNS A-record mapping uses `dpi.dns=true` and `confidence=dns`. Neither is DPI.
+`dpi.engine` is `ndpi` after a TZSP sample is classified by nDPI; otherwise `port`. `confidence=ndpi` is nDPI on sampled packets, never on NetFlow records. SNI uses `dpi.sni=true` and `confidence=sni`. DNS A-record mapping uses `dpi.dns=true` and `confidence=dns`.

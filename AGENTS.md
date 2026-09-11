@@ -16,8 +16,8 @@
 ## 硬边界
 
 - 不做 UI、不做长期数据库、不做 TeamsACS 子系统。
-- 不在 CPE 上开全量镜像；采样包才允许进 DPI。
-- 不把 NetFlow/IPFIX 称为 DPI。
+- 不在 CPE 上开全量镜像；**只有 TZSP 采样包**进 nDPI。
+- 不把 NetFlow/IPFIX 称为 DPI。`confidence=ndpi` 只来自采样。
 - 不解密 TLS。加密流量最多用 SNI/QUIC/DNS/JA3 类侧信道。
 - 仓库与产物不写明文凭据、内网管理地址、客户流量原文。
 - 不把 `100.64/10`（CGNAT/管理隧道）默认当家庭 LAN 客户端。
